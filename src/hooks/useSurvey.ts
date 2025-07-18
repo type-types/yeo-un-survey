@@ -24,24 +24,54 @@ export function useSurvey(userId: string) {
 
   const checkExistingResponse = async () => {
     try {
-      const storageKey = SURVEY_STORAGE_KEY + userId;
-      const storedResponse = localStorage.getItem(storageKey);
+      console.log('🔍 서버에서 설문 완료 여부 확인 시작:', userId);
       
-      if (storedResponse) {
-        const data = JSON.parse(storedResponse) as SurveyResponse;
-        console.log('📱 기존 설문 응답 발견:', data.userName);
+      // 서버에서 설문 완료 여부 확인
+      const response = await fetch(`/api/survey/check?userId=${userId}`);
+      const data = await response.json();
+      
+      if (data.success && data.isCompleted) {
+        console.log('✅ 서버에서 설문 완료 확인:', data.responseData);
+        
+        // 서버에서 설문 완료 확인된 경우 기존 응답으로 설정
         setExistingResponse({
-          ...data,
-          submittedAt: new Date(data.submittedAt),
-          updatedAt: new Date(data.updatedAt)
+          id: userId,
+          userId: userId,
+          userName: data.responseData.userName,
+          submittedAt: new Date(data.responseData.submittedAt),
+          updatedAt: new Date(data.responseData.submittedAt),
+          mainPositions: [],
+          participatingSongs: [],
+          songDetails: {}
         });
       } else {
-        console.log('📱 기존 설문 응답 없음');
+        console.log('📝 서버에서 설문 미완료 확인');
+        setExistingResponse(null);
       }
     } catch (error) {
-      console.error('❌ 기존 응답 확인 오류:', error);
-      // 오류가 발생한 경우 해당 저장소 정리
-      localStorage.removeItem(SURVEY_STORAGE_KEY + userId);
+      console.error('❌ 서버 설문 완료 여부 확인 오류:', error);
+      
+      // 서버 오류 시 로컬 스토리지 백업 확인
+      try {
+        const storageKey = SURVEY_STORAGE_KEY + userId;
+        const storedResponse = localStorage.getItem(storageKey);
+        
+        if (storedResponse) {
+          const data = JSON.parse(storedResponse) as SurveyResponse;
+          console.log('📱 로컬 백업에서 설문 응답 발견:', data.userName);
+          setExistingResponse({
+            ...data,
+            submittedAt: new Date(data.submittedAt),
+            updatedAt: new Date(data.updatedAt)
+          });
+        } else {
+          console.log('📱 로컬 백업도 없음');
+          setExistingResponse(null);
+        }
+      } catch (localError) {
+        console.error('❌ 로컬 백업 확인 오류:', localError);
+        setExistingResponse(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -209,17 +239,37 @@ export function useSurvey(userId: string) {
     }
   };
 
-  // 설문 완료 여부 확인 함수
-  const checkSurveyCompleted = (userId: string): boolean => {
+  // 설문 완료 여부 확인 함수 (서버 기반)
+  const checkSurveyCompleted = async (userId: string): Promise<boolean> => {
     if (!userId) return false;
     
     try {
-      const storageKey = SURVEY_STORAGE_KEY + userId;
-      const storedResponse = localStorage.getItem(storageKey);
-      return storedResponse !== null;
+      console.log('🔍 서버에서 설문 완료 여부 확인:', userId);
+      
+      const response = await fetch(`/api/survey/check?userId=${userId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ 서버 설문 완료 여부:', data.isCompleted);
+        return data.isCompleted;
+      } else {
+        console.error('❌ 서버 응답 오류:', data.error);
+        return false;
+      }
     } catch (error) {
       console.error('❌ 설문 완료 여부 확인 오류:', error);
-      return false;
+      
+      // 서버 오류 시 로컬 스토리지 백업 확인
+      try {
+        const storageKey = SURVEY_STORAGE_KEY + userId;
+        const storedResponse = localStorage.getItem(storageKey);
+        const hasLocalBackup = storedResponse !== null;
+        console.log('📱 로컬 백업 확인 결과:', hasLocalBackup);
+        return hasLocalBackup;
+      } catch (localError) {
+        console.error('❌ 로컬 백업 확인 오류:', localError);
+        return false;
+      }
     }
   };
 
