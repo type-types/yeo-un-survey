@@ -1,4 +1,4 @@
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -13,16 +13,31 @@ function createFirebaseAdminApp() {
     return getApps()[0];
   }
 
-  console.log('🚀 Firebase Admin 앱 초기화 시작 (개발 모드)');
+  console.log('🚀 Firebase Admin 앱 초기화 시작');
 
   try {
-    // 개발 환경에서는 프로젝트 ID만으로 초기화
-    const app = initializeApp({
-      projectId: firebaseAdminConfig.projectId,
-    });
-    
-    console.log('✅ Firebase Admin 앱 초기화 완료');
-    return app;
+    // 서비스 계정 키가 있으면 사용
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      console.log('🔑 서비스 계정 키로 Firebase Admin 초기화');
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      
+      const app = initializeApp({
+        credential: cert(serviceAccount),
+        projectId: firebaseAdminConfig.projectId,
+      });
+      
+      console.log('✅ Firebase Admin 앱 초기화 완료 (서비스 계정)');
+      return app;
+    } else {
+      // 개발 환경에서는 프로젝트 ID만으로 초기화
+      console.log('🏠 개발 모드: 프로젝트 ID로 Firebase Admin 초기화');
+      const app = initializeApp({
+        projectId: firebaseAdminConfig.projectId,
+      });
+      
+      console.log('✅ Firebase Admin 앱 초기화 완료 (개발 모드)');
+      return app;
+    }
     
   } catch (error) {
     console.log('🔄 첫 번째 시도 실패, 대안 앱명으로 재시도');
