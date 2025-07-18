@@ -2,22 +2,97 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useSurvey } from '@/hooks/useSurvey';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import MobileCalendar from '@/components/MobileCalendar';
 
-export default function HomePage() {
-  const { user, loading, signInWithKakao, signOut, isKakaoLoaded } = useAuth();
+// useSearchParams를 사용하는 실제 컴포넌트
+function HomePageContent() {
+  const { user, loading, signInWithKakao, signInWithKakaoCode, signOut, isKakaoLoaded } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loginLoading, setLoginLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'survey' | 'calendar'>('survey');
+  const [kakaoLoginLoading, setKakaoLoginLoading] = useState(false);
+  
+  // 카카오 코드 처리 중복 방지를 위한 ref
+  const processingCodeRef = useRef<string | null>(null);
+  const isProcessingRef = useRef(false);
   
   // 설문 완료 여부 체크를 위해 useSurvey 훅 사용
   const { checkSurveyCompleted } = useSurvey(user?.id || '');
   
   // 설문 완료 여부 상태 추가
   const [isSurveyCompleted, setIsSurveyCompleted] = useState(false);
+
+  // 카카오 로그인 리다이렉트 처리
+  useEffect(() => {
+    const handleKakaoCallback = async () => {
+      // URL에서 인가 코드 확인
+      const authorizationCode = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+
+      if (error) {
+        console.error('❌ 카카오 로그인 오류:', error);
+        alert('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
+        return;
+      }
+
+      // 인가 코드가 있고, 상태가 로그인이며, 아직 로그인되지 않은 경우
+      if (authorizationCode && state?.startsWith('login_') && !user && !loading) {
+        
+        // 중복 처리 방지 체크
+        if (isProcessingRef.current || processingCodeRef.current === authorizationCode) {
+          console.log('⚠️ 이미 처리 중이거나 처리된 인가 코드입니다.');
+          return;
+        }
+
+        // 처리 시작 표시
+        isProcessingRef.current = true;
+        processingCodeRef.current = authorizationCode;
+        
+        console.log('🔄 카카오 인가 코드 감지, 자동 로그인 처리:', authorizationCode.substring(0, 20) + '...');
+        setKakaoLoginLoading(true);
+
+        try {
+          await signInWithKakaoCode(authorizationCode);
+          console.log('✅ 카카오 자동 로그인 성공');
+          
+          // URL에서 파라미터 제거 (깔끔한 URL을 위해)
+          const url = new URL(window.location.href);
+          url.search = '';
+          window.history.replaceState({}, '', url.toString());
+          
+        } catch (error: any) {
+          console.error('❌ 카카오 자동 로그인 실패:', error);
+          
+          // 사용자 친화적인 오류 메시지
+          let errorMessage = '로그인 처리 중 오류가 발생했습니다.';
+          
+          if (error.message.includes('인가 코드가 만료되었거나')) {
+            errorMessage = '로그인 세션이 만료되었습니다. 다시 로그인해주세요.';
+          } else if (error.message.includes('Firebase Admin')) {
+            errorMessage = '서버 설정에 문제가 있습니다. 잠시 후 다시 시도해주세요.';
+          }
+          
+          alert(errorMessage);
+          
+          // URL 정리
+          const url = new URL(window.location.href);
+          url.search = '';
+          window.history.replaceState({}, '', url.toString());
+          
+        } finally {
+          setKakaoLoginLoading(false);
+          isProcessingRef.current = false;
+        }
+      }
+    };
+
+    handleKakaoCallback();
+  }, [searchParams, user, loading, signInWithKakaoCode]);
 
   useEffect(() => {
     // 로그인된 사용자가 있고 로딩이 완료된 경우
@@ -107,12 +182,19 @@ export default function HomePage() {
     }
   };
 
-  if (loading) {
+  if (loading || kakaoLoginLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
+          <p className="text-gray-600">
+            {kakaoLoginLoading ? '카카오 로그인 처리 중...' : '로딩 중...'}
+          </p>
+          {kakaoLoginLoading && (
+            <p className="text-sm text-gray-500 mt-2">
+              잠시만 기다려주세요...
+            </p>
+          )}
         </div>
       </div>
     );
@@ -315,5 +397,21 @@ export default function HomePage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Suspense 경계로 감싸는 메인 컴포넌트
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-blue-600 font-medium">페이지 로딩 중...</p>
+        </div>
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
   );
 }

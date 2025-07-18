@@ -72,7 +72,7 @@ export function useAuth() {
           },
           body: JSON.stringify({ 
             authorizationCode,
-            redirectUri: `${window.location.origin}/survey`
+            redirectUri: `${window.location.origin}/`
           }),
         });
 
@@ -132,7 +132,7 @@ export function useAuth() {
           },
           body: JSON.stringify({ 
             authorizationCode,
-            redirectUri: `${window.location.origin}/survey`
+            redirectUri: `${window.location.origin}/`
           }),
         });
 

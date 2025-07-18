@@ -80,7 +80,7 @@ export function useKakaoAuth() {
           console.log('✅ authorize 메소드를 사용한 리다이렉트 로그인');
           
           // 리다이렉트 URI 설정 (카카오 앱에 등록된 URI와 동일해야 함)
-          const redirectUri = `${window.location.origin}/survey`;
+          const redirectUri = `${window.location.origin}/`;
           
           // state 파라미터로 로그인 상태 구분
           const state = `login_${Date.now()}`;
@@ -147,7 +147,7 @@ export function useKakaoAuth() {
         },
         body: JSON.stringify({ 
           authorizationCode,
-          redirectUri: `${window.location.origin}/survey`
+          redirectUri: `${window.location.origin}/`
         }),
       });
 
