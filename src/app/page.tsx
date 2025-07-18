@@ -157,28 +157,16 @@ export default function HomePage() {
             {/* 달력만 표시 */}
             <MobileCalendar />
 
-            {/* 로그아웃 버튼 */}
-            <div className="mt-6">
+            {/* 로그아웃 링크 */}
+            <div className="mt-6 text-center">
               <button
                 onClick={handleLogout}
                 disabled={logoutLoading}
-                className={`w-full font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 ${
-                  logoutLoading
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 hover:border-red-300'
+                className={`text-gray-500 underline hover:text-gray-700 transition-colors duration-200 ${
+                  logoutLoading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
                 }`}
               >
-                {logoutLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
-                    <span>로그아웃 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🚪</span>
-                    <span>로그아웃</span>
-                  </>
-                )}
+                {logoutLoading ? '로그아웃 중...' : '로그아웃'}
               </button>
             </div>
           </>
@@ -203,28 +191,16 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* 로그아웃 버튼 */}
-            <div className="mt-6">
+            {/* 로그아웃 링크 */}
+            <div className="mt-6 text-center">
               <button
                 onClick={handleLogout}
                 disabled={logoutLoading}
-                className={`w-full font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 ${
-                  logoutLoading
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 hover:border-red-300'
+                className={`text-gray-500 underline hover:text-gray-700 transition-colors duration-200 ${
+                  logoutLoading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
                 }`}
               >
-                {logoutLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
-                    <span>로그아웃 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🚪</span>
-                    <span>로그아웃</span>
-                  </>
-                )}
+                {logoutLoading ? '로그아웃 중...' : '로그아웃'}
               </button>
             </div>
           </>

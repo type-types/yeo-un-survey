@@ -34,14 +34,12 @@ export default function SongDetailStep({
   const availablePositions = getDetailedPositions(mainPositions);
   const currentScore = songDetail?.completionScore || 0;
   const selectedPositions = songDetail?.selectedPositions || [];
+  const selectedPosition = selectedPositions.length > 0 ? selectedPositions[0] : null;
   const opinion = songDetail?.opinion || '';
 
-  const handlePositionToggle = (position: DetailedPosition) => {
-    const newPositions = selectedPositions.includes(position)
-      ? selectedPositions.filter(p => p !== position)
-      : [...selectedPositions, position];
-    
-    onDetailChange({ selectedPositions: newPositions });
+  const handlePositionSelect = (position: DetailedPosition) => {
+    // 라디오 버튼처럼 하나만 선택
+    onDetailChange({ selectedPositions: [position] });
   };
 
   const handleScoreClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -60,7 +58,8 @@ export default function SongDetailStep({
     onDetailChange({ opinion: value });
   };
 
-  const canProceed = selectedPositions.length > 0;
+  // 포지션 선택과 완성도 점수 모두 필수
+  const canProceed = selectedPositions.length > 0 && currentScore > 0;
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
@@ -83,23 +82,24 @@ export default function SongDetailStep({
           {/* 포지션 선택 */}
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-3">
-              이 곡에서 어떤 포지션으로 참여하시나요?
+              이 곡에서 어떤 포지션으로 참여하시나요? <span className="text-red-500">*</span>
             </h3>
             <div className="space-y-2">
               {availablePositions.map((position) => (
                 <label
                   key={position}
                   className={`flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectedPositions.includes(position)
+                    selectedPosition === position
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <input
-                    type="checkbox"
-                    checked={selectedPositions.includes(position)}
-                    onChange={() => handlePositionToggle(position)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    type="radio"
+                    name="position"
+                    checked={selectedPosition === position}
+                    onChange={() => handlePositionSelect(position)}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500 focus:ring-2"
                   />
                   <span className="ml-3 text-gray-800">{position}</span>
                 </label>
@@ -110,7 +110,7 @@ export default function SongDetailStep({
           {/* 완성도 점수 */}
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-3">
-              이 곡의 완성도가 몇점이라고 생각하시나요?
+              이 곡의 완성도가 몇점이라고 생각하시나요? <span className="text-red-500">*</span>
             </h3>
             <div className="mb-4">
               <div
@@ -132,7 +132,7 @@ export default function SongDetailStep({
                 </div>
               </div>
               <div className="text-center mt-2">
-                <span className="text-2xl font-bold text-gray-800">
+                <span className={`font-bold ${currentScore === 0 ? 'text-base text-red-500' : 'text-2xl text-gray-800'}`}>
                   {currentScore === 0 ? '점수를 선택해주세요' : `${currentScore}/10`}
                 </span>
               </div>
@@ -148,7 +148,7 @@ export default function SongDetailStep({
               value={opinion}
               onChange={(e) => handleOpinionChange(e.target.value)}
               placeholder="곡에 대한 의견, 개선점, 좋았던 점 등을 적어주세요"
-              className="w-full h-24 p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
+              className="w-full h-24 p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none resize-none text-gray-900 placeholder-gray-500"
             />
           </div>
         </div>
@@ -184,6 +184,27 @@ export default function SongDetailStep({
             )}
           </button>
         </div>
+
+        {/* 필수 항목 안내 */}
+        {!canProceed && (
+          <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-400 rounded">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <span className="text-red-400">⚠️</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  {selectedPositions.length === 0 && currentScore === 0 
+                    ? '포지션 선택과 완성도 점수를 입력해주세요.'
+                    : selectedPositions.length === 0 
+                    ? '포지션을 선택해주세요.'
+                    : '완성도 점수를 입력해주세요.'
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

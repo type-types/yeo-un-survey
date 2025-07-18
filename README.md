@@ -10,18 +10,53 @@
 - 📊 **만족도 평가**: 0-10점 척도로 곡별 완성도 평가
 - 💬 **의견 수집**: 곡별 상세 의견 작성
 - 👨‍💼 **관리자 페이지**: 설문 결과 조회 및 분석
+- 📅 **모바일 달력**: 공연 일정 확인
 
 ## 🛠️ 기술 스택
 
-- **Frontend**: Next.js 15, React, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend**: Firebase (Authentication, Firestore, Functions)
 - **Auth**: Kakao Login API
 - **Database**: Firebase Firestore (NoSQL)
 - **Hosting**: Vercel/Firebase Hosting
+- **Styling**: Tailwind CSS v4
+- **Icons**: Lucide React
+
+## 📁 프로젝트 구조
+
+```
+yeo-un-survey/
+├── src/
+│   ├── app/                      # Next.js App Router
+│   │   ├── admin/               # 관리자 페이지
+│   │   ├── api/                 # API Routes
+│   │   │   ├── admin/          # 관리자 API
+│   │   │   ├── auth/           # 인증 API (카카오)
+│   │   │   └── survey/         # 설문 API
+│   │   ├── survey/             # 설문 페이지
+│   │   ├── layout.tsx          # 루트 레이아웃
+│   │   └── page.tsx            # 홈페이지
+│   ├── components/             # 재사용 가능한 컴포넌트
+│   │   ├── survey/            # 설문 관련 컴포넌트
+│   │   ├── AdminProtectedRoute.tsx
+│   │   └── MobileCalendar.tsx
+│   ├── hooks/                  # 커스텀 React 훅
+│   │   ├── useAuth.ts         # 인증 훅
+│   │   ├── useKakaoAuth.ts    # 카카오 로그인 훅
+│   │   └── useSurvey.ts       # 설문 훅
+│   ├── lib/                   # 라이브러리 설정
+│   │   ├── firebase.ts        # Firebase 클라이언트 설정
+│   │   └── firebase-admin.ts  # Firebase Admin SDK
+│   ├── types/                 # TypeScript 타입 정의
+│   └── constants/             # 상수 (곡 목록 등)
+├── docs/                      # 문서
+├── public/                    # 정적 파일
+└── 설정 파일들...
+```
 
 ## 📊 데이터베이스 구조
 
-![ERD](docs/database-schema.md)
+자세한 내용은 [데이터베이스 스키마 문서](docs/database-schema.md)를 참조하세요.
 
 ### 주요 컬렉션
 
@@ -41,30 +76,75 @@ npm install
 
 ### 2. 환경변수 설정
 
+프로젝트 루트에 `.env.local` 파일을 생성하고 다음 내용을 추가하세요:
+
 ```bash
-# .env.local 파일 생성
+# 카카오 로그인 설정
 NEXT_PUBLIC_KAKAO_CLIENT_ID=your-kakao-javascript-key
+
+# Firebase 설정
+NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your-measurement-id
+
+# Firebase Admin SDK (서버사이드용)
+FIREBASE_PRIVATE_KEY=your-firebase-private-key
+FIREBASE_CLIENT_EMAIL=your-firebase-client-email
 ```
 
 ### 3. Firebase 설정
 
-1. Firebase Console에서 프로젝트 생성
-2. Authentication → Google 로그인 활성화
-3. Firestore Database 생성 (테스트 모드)
-4. 보안 규칙 설정
+1. [Firebase Console](https://console.firebase.google.com/)에서 프로젝트 생성
+2. Authentication → Sign-in method → Google 로그인 활성화
+3. Firestore Database 생성 (테스트 모드로 시작)
+4. 프로젝트 설정 → 일반 → Firebase SDK 스니펫에서 구성 정보 복사
+5. 보안 규칙 설정 (아래 참조)
 
 ### 4. 카카오 로그인 설정
 
-1. [카카오 개발자 센터](https://developers.kakao.com/) 앱 등록
-2. 웹 플랫폼 등록: `http://localhost:3000`
-3. 카카오 로그인 활성화
-4. JavaScript 키를 환경변수에 설정
+1. [카카오 개발자 센터](https://developers.kakao.com/)에서 앱 등록
+2. **웹 플랫폼 등록**: `http://localhost:3000`
+3. **카카오 로그인 활성화**: ON
+4. **Redirect URI 설정**:
+   - `http://localhost:3000/survey`
+   - `http://localhost:3000` (옵션)
+5. **동의 항목 설정**:
+   - 닉네임 (필수)
+   - 프로필 사진 (선택)
+   - 카카오계정 이메일 (선택)
+6. JavaScript 키를 `.env.local`의 `NEXT_PUBLIC_KAKAO_CLIENT_ID`에 설정
+
+> 📋 **상세한 카카오 설정 가이드**: [check-kakao-setup.md](check-kakao-setup.md) 파일을 참조하세요.
 
 ### 5. 개발 서버 실행
 
 ```bash
 npm run dev
 ```
+
+브라우저에서 `http://localhost:3000`으로 접속하세요.
+
+## 📡 API 엔드포인트
+
+### 인증 API
+
+- `POST /api/auth/kakao` - 카카오 로그인 토큰 검증
+- `GET /api/auth/kakao-callback` - 카카오 로그인 콜백
+- `POST /api/auth/kakao-direct` - 직접 카카오 로그인
+
+### 설문 API
+
+- `POST /api/survey/submit` - 설문 응답 제출
+- `GET /api/survey/check` - 설문 완료 여부 확인
+
+### 관리자 API
+
+- `GET /api/admin/users` - 사용자 목록 조회
+- `POST /api/admin/promote` - 사용자 관리자 권한 부여
 
 ## 🎯 설문 진행 플로우
 
@@ -122,6 +202,8 @@ npm run dev
 
 ## 🔒 보안 규칙
 
+Firebase Firestore 보안 규칙:
+
 ```javascript
 rules_version = '2';
 service cloud.firestore {
@@ -138,6 +220,11 @@ service cloud.firestore {
         (request.auth.uid == resource.data.userId ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
     }
+
+    // 곡 정보는 모든 인증된 사용자가 읽기 가능
+    match /songs/{songId} {
+      allow read: if request.auth != null;
+    }
   }
 }
 ```
@@ -150,19 +237,108 @@ service cloud.firestore {
 
 ## 🚀 배포
 
-### Vercel 배포
+### Vercel 배포 (권장)
 
-```bash
-npm run build
-vercel --prod
-```
+1. GitHub에 코드 푸시
+2. [Vercel](https://vercel.com/)에서 프로젝트 import
+3. 환경변수 설정:
+   - Settings → Environment Variables
+   - `.env.local`의 모든 환경변수 추가
+4. 자동 배포 완료
 
 ### Firebase Hosting 배포
 
 ```bash
+# Firebase CLI 설치
+npm install -g firebase-tools
+
+# Firebase 로그인
+firebase login
+
+# 프로젝트 초기화
+firebase init hosting
+
+# 빌드 및 배포
 npm run build
 firebase deploy
 ```
+
+## 🛠️ 트러블슈팅
+
+### 카카오 로그인 오류
+
+**KOE101 오류 (앱이 제대로 구성되지 않음)**:
+
+1. 카카오 개발자 센터에서 앱 키 확인
+2. Redirect URI 설정 확인: `http://localhost:3000/survey`
+3. 웹 플랫폼 등록 확인: `http://localhost:3000`
+4. 카카오 로그인 활성화 여부 확인
+
+**SDK 로딩 오류**:
+
+```bash
+# 캐시 삭제 후 재시작
+rm -rf .next
+npm run dev
+```
+
+### Firebase 연결 오류
+
+**환경변수 확인**:
+
+```bash
+# .env.local 파일이 있는지 확인
+ls -la .env.local
+
+# 환경변수가 제대로 로드되는지 확인
+npm run dev
+```
+
+**보안 규칙 오류**:
+
+- Firebase Console → Firestore Database → Rules에서 규칙 확인
+- 테스트 모드로 임시 설정 후 점진적으로 규칙 적용
+
+### 일반적인 오류
+
+**의존성 오류**:
+
+```bash
+# node_modules 재설치
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**포트 충돌**:
+
+```bash
+# 다른 포트로 실행
+npm run dev -- -p 3001
+```
+
+## 🧪 테스트
+
+### 개발 환경 테스트
+
+1. 카카오 로그인 기능 테스트
+2. 설문 제출 및 저장 테스트
+3. 관리자 페이지 접근 테스트
+4. 반응형 디자인 테스트
+
+### 프로덕션 배포 전 체크리스트
+
+- [ ] 환경변수 설정 완료
+- [ ] Firebase 보안 규칙 적용
+- [ ] 카카오 앱 프로덕션 도메인 등록
+- [ ] 관리자 계정 설정
+- [ ] 곡 목록 최신화
+
+## 📈 성능 최적화
+
+- Next.js 15의 최신 최적화 기능 활용
+- Tailwind CSS로 CSS 번들 크기 최소화
+- Firebase Firestore 쿼리 최적화
+- 이미지 최적화 (Next.js Image 컴포넌트)
 
 ## 📄 라이선스
 
