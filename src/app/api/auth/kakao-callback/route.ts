@@ -176,9 +176,24 @@ export async function POST(request: NextRequest) {
       await adminAuth.getUser(firebaseUid);
       console.log('👤 기존 사용자 발견:', firebaseUid);
       
-      // 기존 사용자라면 Custom Claims 업데이트
+      // 기존 사용자 정보 업데이트
+      await adminAuth.updateUser(firebaseUid, {
+        displayName: userInfo.name,
+        photoURL: userInfo.profileImage || undefined,
+      });
+      console.log('✅ 기존 사용자 정보 업데이트 완료');
+      
+      // Custom Claims 업데이트
       await adminAuth.setCustomUserClaims(firebaseUid, customClaims);
       console.log('✅ Custom Claims 업데이트 완료');
+      
+      // Firestore 사용자 정보도 업데이트
+      await adminFirestore.collection('users').doc(firebaseUid).update({
+        name: userInfo.name,
+        profileImage: userInfo.profileImage,
+        updatedAt: new Date(),
+      });
+      console.log('✅ Firestore 사용자 정보 업데이트 완료');
       
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
