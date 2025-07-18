@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { signInWithCustomToken } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 
 // 카카오 SDK 타입 선언
 declare global {
@@ -13,92 +11,197 @@ export function useKakaoAuth() {
   const [isKakaoLoaded, setIsKakaoLoaded] = useState(false);
 
   useEffect(() => {
-    // 카카오 SDK 로드 상태 체크
-    const checkKakaoSDK = () => {
+    // 카카오 SDK 초기화
+    const initKakaoSDK = () => {
       if (typeof window !== 'undefined' && window.Kakao) {
         const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+        
         if (kakaoKey && kakaoKey !== 'your-kakao-client-id') {
+          // SDK가 이미 초기화되어 있는지 확인
           if (!window.Kakao.isInitialized()) {
-            window.Kakao.init(kakaoKey);
-            console.log('카카오 SDK 초기화 완료');
+            try {
+              window.Kakao.init(kakaoKey);
+              console.log('✅ 카카오 SDK 초기화 완료');
+              console.log('SDK Version:', window.Kakao.VERSION);
+            } catch (error) {
+              console.error('❌ 카카오 SDK 초기화 실패:', error);
+              return;
+            }
           }
-          setIsKakaoLoaded(true);
+          
+          // SDK가 완전히 로드되었는지 확인
+          if (window.Kakao.Auth && window.Kakao.API) {
+            setIsKakaoLoaded(true);
+            console.log('✅ 카카오 SDK 로드 완료');
+            
+            // 🔍 카카오 SDK 구조 디버깅 (개발 환경에서만)
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🔍 Kakao.Auth 메소드들:', Object.getOwnPropertyNames(window.Kakao.Auth));
+              const authMethods = Object.getOwnPropertyNames(window.Kakao.Auth).filter(
+                key => typeof window.Kakao.Auth[key] === 'function'
+              );
+              console.log('🔍 Kakao.Auth 함수들:', authMethods);
+            }
+            
+          } else {
+            console.log('⏳ 카카오 SDK 모듈 로딩 중...');
+            setTimeout(initKakaoSDK, 100);
+          }
+        } else {
+          console.error('❌ 카카오 클라이언트 ID가 설정되지 않았습니다');
         }
       } else {
-        // SDK가 아직 로드되지 않았다면 100ms 후 다시 체크
-        setTimeout(checkKakaoSDK, 100);
+        console.log('⏳ 카카오 SDK 로딩 대기 중...');
+        setTimeout(initKakaoSDK, 100);
       }
     };
 
-    checkKakaoSDK();
+    initKakaoSDK();
   }, []);
 
   const signInWithKakao = async () => {
-    try {
-      // SDK 로드 상태 체크
-      if (!isKakaoLoaded) {
-        // SDK 로드를 기다림
-        return new Promise((resolve, reject) => {
-          const waitForKakao = () => {
-            if (isKakaoLoaded) {
-              resolve(performKakaoLogin());
-            } else {
-              setTimeout(waitForKakao, 100);
+    return new Promise((resolve, reject) => {
+      try {
+        // SDK 로드 확인
+        if (!isKakaoLoaded) {
+          reject(new Error('카카오 SDK가 아직 로드되지 않았습니다.'));
+          return;
+        }
+
+        if (!window.Kakao || !window.Kakao.Auth) {
+          reject(new Error('카카오 Auth 모듈을 찾을 수 없습니다.'));
+          return;
+        }
+
+        console.log('🚀 카카오 로그인 시작');
+
+        // authorize 메소드를 사용한 리다이렉트 방식 로그인
+        if (typeof window.Kakao.Auth.authorize === 'function') {
+          console.log('✅ authorize 메소드를 사용한 리다이렉트 로그인');
+          
+          // 리다이렉트 URI 설정 (카카오 앱에 등록된 URI와 동일해야 함)
+          const redirectUri = `${window.location.origin}/survey`;
+          
+          // state 파라미터로 로그인 상태 구분
+          const state = `login_${Date.now()}`;
+          
+          // authorize 호출 - 카카오 로그인 페이지로 리다이렉트
+          window.Kakao.Auth.authorize({
+            redirectUri: redirectUri,
+            state: state
+          });
+          
+          // 리다이렉트이므로 Promise는 여기서 완료되지 않음
+          // 실제 로그인 처리는 리다이렉트된 페이지에서 수행
+          
+        } else if (typeof window.Kakao.Auth.login === 'function') {
+          console.log('✅ login 메소드 사용 가능 (팝업 방식)');
+          
+          // 팝업 방식 로그인 (구버전 호환)
+          window.Kakao.Auth.login({
+            success: function(authObj: any) {
+              console.log('✅ 카카오 인증 성공:', authObj);
+              
+              // 사용자 정보 가져오기
+              window.Kakao.API.request({
+                url: '/v2/user/me',
+                success: function(response: any) {
+                  console.log('✅ 사용자 정보 가져오기 성공:', response);
+                  resolve(response);
+                },
+                fail: function(error: any) {
+                  console.error('❌ 사용자 정보 가져오기 실패:', error);
+                  reject(new Error(`사용자 정보 가져오기 실패: ${error.msg || error.error_description}`));
+                }
+              });
+            },
+            fail: function(err: any) {
+              console.error('❌ 카카오 로그인 실패:', err);
+              reject(new Error(`카카오 로그인 실패: ${err.error_description || err.error}`));
             }
-          };
-          waitForKakao();
-        });
+          });
+          
+        } else {
+          console.error('❌ 사용 가능한 로그인 메소드를 찾을 수 없습니다');
+          reject(new Error('카카오 로그인 메소드를 찾을 수 없습니다.'));
+        }
+
+      } catch (error) {
+        console.error('❌ 카카오 로그인 예외:', error);
+        reject(error);
+      }
+    });
+  };
+
+  // 인가 코드로 사용자 정보 가져오기 (리다이렉트 후 호출)
+  const getKakaoUserFromCode = async (authorizationCode: string) => {
+    try {
+      console.log('🔄 인가 코드로 사용자 정보 요청:', authorizationCode);
+      
+      // 클라이언트에서 직접 토큰 교환은 보안상 권장되지 않으므로
+      // 서버 API를 통해 처리하도록 수정
+      const response = await fetch('/api/auth/kakao-callback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          authorizationCode,
+          redirectUri: `${window.location.origin}/survey`
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`서버 응답 오류: ${response.status}`);
       }
 
-      return await performKakaoLogin();
+      const userData = await response.json();
+      console.log('✅ 사용자 정보 획득 성공:', userData);
+      
+      return userData;
+      
     } catch (error) {
-      console.error('카카오 로그인 오류:', error);
+      console.error('❌ 인가 코드 처리 실패:', error);
       throw error;
     }
   };
 
-  const performKakaoLogin = async () => {
-    if (!window.Kakao) {
-      throw new Error('카카오 SDK가 로드되지 않았습니다.');
-    }
-
-    if (!window.Kakao.Auth) {
-      throw new Error('카카오 Auth 모듈이 로드되지 않았습니다.');
-    }
-
-    const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
-    if (!kakaoKey || kakaoKey === 'your-kakao-client-id') {
-      throw new Error('카카오 클라이언트 ID가 설정되지 않았습니다.');
-    }
-
+  // 카카오 로그아웃
+  const signOutWithKakao = () => {
     return new Promise((resolve, reject) => {
-      window.Kakao.Auth.login({
-        success: async (response: any) => {
-          try {
-            // 카카오 사용자 정보 가져오기
-            window.Kakao.API.request({
-              url: '/v2/user/me',
-              success: async (userInfo: any) => {
-                console.log('카카오 사용자 정보:', userInfo);
-                
-                // 여기서 Firebase Custom Token을 생성하고 로그인
-                // 실제 구현에서는 서버에서 Custom Token을 생성해야 함
-                // 현재는 임시로 Google 로그인으로 리다이렉트
-                console.log('카카오 로그인 성공, 사용자 정보:', userInfo);
-                resolve(userInfo);
-              },
-              fail: (error: any) => {
-                console.error('카카오 사용자 정보 요청 실패:', error);
-                reject(error);
-              }
-            });
-          } catch (error) {
-            console.error('Firebase 로그인 오류:', error);
-            reject(error);
-          }
+      if (!window.Kakao || !window.Kakao.Auth) {
+        resolve(true);
+        return;
+      }
+
+      // 카카오 로그아웃
+      if (window.Kakao.Auth.getAccessToken()) {
+        window.Kakao.Auth.logout(() => {
+          console.log('✅ 카카오 로그아웃 완료');
+          resolve(true);
+        });
+      } else {
+        resolve(true);
+      }
+    });
+  };
+
+  // 연결 끊기 (선택사항)
+  const unlinkKakao = () => {
+    return new Promise((resolve, reject) => {
+      if (!window.Kakao || !window.Kakao.API) {
+        resolve(true);
+        return;
+      }
+
+      window.Kakao.API.request({
+        url: '/v1/user/unlink',
+        success: function(response: any) {
+          console.log('✅ 카카오 연결 끊기 성공:', response);
+          resolve(response);
         },
-        fail: (error: any) => {
-          console.error('카카오 로그인 실패:', error);
+        fail: function(error: any) {
+          console.error('❌ 카카오 연결 끊기 실패:', error);
           reject(error);
         }
       });
@@ -107,6 +210,9 @@ export function useKakaoAuth() {
 
   return {
     signInWithKakao,
+    getKakaoUserFromCode,
+    signOutWithKakao,
+    unlinkKakao,
     isKakaoLoaded
   };
 } 

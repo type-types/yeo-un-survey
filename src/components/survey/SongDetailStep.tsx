@@ -12,6 +12,7 @@ interface SongDetailStepProps {
   onNext: () => void;
   onPrevious: () => void;
   isLastSong: boolean;
+  submitLoading?: boolean;
 }
 
 export default function SongDetailStep({
@@ -23,7 +24,8 @@ export default function SongDetailStep({
   onDetailChange,
   onNext,
   onPrevious,
-  isLastSong
+  isLastSong,
+  submitLoading = false
 }: SongDetailStepProps) {
   const [scoreAnimation, setScoreAnimation] = useState(false);
 
@@ -154,20 +156,32 @@ export default function SongDetailStep({
         <div className="flex space-x-4 mt-8">
           <button
             onClick={onPrevious}
-            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+            disabled={submitLoading}
+            className={`flex-1 font-semibold py-3 px-6 rounded-lg transition-colors duration-200 ${
+              submitLoading 
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+            }`}
           >
             이전
           </button>
           <button
             onClick={onNext}
-            disabled={!canProceed}
+            disabled={!canProceed || submitLoading}
             className={`flex-1 font-semibold py-3 px-6 rounded-lg transition-colors duration-200 ${
-              canProceed
+              canProceed && !submitLoading
                 ? `${isLastSong ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'} text-white`
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {isLastSong ? '설문 완료' : '다음 곡'}
+            {submitLoading && isLastSong ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                <span>제출 중...</span>
+              </div>
+            ) : (
+              isLastSong ? '설문 완료' : '다음 곡'
+            )}
           </button>
         </div>
       </div>

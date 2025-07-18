@@ -1,32 +1,31 @@
 'use client';
 
-import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useAdminAuth, adminUtils } from '@/hooks/useAdminAuth';
+import { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { SurveyResponse } from '@/types';
 import { SONGS } from '@/constants/songs';
+import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 
-export default function AdminPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+function AdminPageContent() {
+  const { user, hasAccess } = useAdminAuth();
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/');
-    } else if (user && !user.isAdmin) {
-      setError('관리자 권한이 필요합니다.');
-    } else if (user && user.isAdmin) {
+    if (hasAccess && user) {
+      adminUtils.adminLog('관리자 페이지 접근', { userId: user.id, name: user.name });
       fetchResponses();
     }
-  }, [user, authLoading, router]);
+  }, [hasAccess, user]);
 
   const fetchResponses = async () => {
     try {
+      adminUtils.requireAdmin(user);
+      adminUtils.adminLog('설문 응답 데이터 조회 시작');
+      
       const q = query(collection(db, 'responses'), orderBy('submittedAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const responsesData: SurveyResponse[] = [];
@@ -42,20 +41,22 @@ export default function AdminPage() {
       });
       
       setResponses(responsesData);
-    } catch (err) {
+      adminUtils.adminLog('설문 응답 데이터 조회 완료', { count: responsesData.length });
+      
+    } catch (err: any) {
       console.error('응답 데이터 가져오기 실패:', err);
-      setError('데이터를 불러오는 중 오류가 발생했습니다.');
+      setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
+          <p className="text-gray-600">관리자 데이터 로딩 중...</p>
         </div>
       </div>
     );
@@ -65,13 +66,13 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">접근 권한 없음</h1>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">데이터 로드 오류</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={() => router.push('/')}
+            onClick={() => window.location.reload()}
             className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
           >
-            홈으로 돌아가기
+            다시 시도
           </button>
         </div>
       </div>
@@ -114,17 +115,28 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            🎵 여운 공연 설문 결과
-          </h1>
-          <p className="text-gray-600">
-            총 {responses.length}명이 설문에 참여했습니다.
-          </p>
+        {/* 관리자 헤더 */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg p-6 mb-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">
+                🎵 여운 공연 설문 결과 관리
+              </h1>
+              <p className="text-blue-100">
+                관리자: {user?.name} | 총 {responses.length}명 참여
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="bg-white/20 rounded-lg p-3">
+                <div className="text-sm">관리자 권한</div>
+                <div className="text-lg font-bold">✅ 활성화</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* 전체 통계 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <h3 className="font-semibold text-gray-800 mb-2">📊 참여자 수</h3>
             <p className="text-2xl font-bold text-blue-600">{responses.length}명</p>
@@ -141,6 +153,24 @@ export default function AdminPage() {
               )}개
             </p>
           </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="font-semibold text-gray-800 mb-2">⭐ 평균 점수</h3>
+            <p className="text-2xl font-bold text-yellow-600">
+              {(() => {
+                const allScores: number[] = [];
+                responses.forEach(response => {
+                  Object.values(response.songDetails).forEach(detail => {
+                    if (detail.completionScore !== null) {
+                      allScores.push(detail.completionScore);
+                    }
+                  });
+                });
+                return allScores.length > 0 
+                  ? (allScores.reduce((sum, score) => sum + score, 0) / allScores.length).toFixed(1)
+                  : '0.0';
+              })()}점
+            </p>
+          </div>
         </div>
 
         {/* 곡별 결과 */}
@@ -155,77 +185,61 @@ export default function AdminPage() {
                   <h2 className="text-xl font-bold text-gray-800">
                     {song.id}. {song.title}
                   </h2>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-500">참여자 수</div>
-                    <div className="text-lg font-bold text-blue-600">{participants.length}명</div>
+                  <div className="flex gap-4">
+                    <div className="text-center">
+                      <div className="text-sm text-gray-500">참여자</div>
+                      <div className="text-lg font-bold text-blue-600">{participants.length}명</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-500">평균 점수</div>
+                      <div className="text-lg font-bold text-green-600">{averageScore}점</div>
+                    </div>
                   </div>
                 </div>
 
-                {participants.length > 0 && (
-                  <>
-                    <div className="mb-4">
-                      <div className="flex items-center mb-2">
-                        <span className="text-sm font-semibold text-gray-700">평균 완성도:</span>
-                        <span className="ml-2 text-lg font-bold text-green-600">{averageScore}/10</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-red-400 via-yellow-400 to-green-400 h-2 rounded-full"
-                          style={{ width: `${(parseFloat(averageScore) / 10) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* 포지션별 참여자 */}
-                      <div>
-                        <h4 className="font-semibold text-gray-800 mb-2">👥 포지션별 참여자</h4>
-                        <div className="space-y-2">
-                          {participants.map((participant, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                              <div>
-                                <span className="font-medium">{participant.user.userName}</span>
-                                <div className="text-sm text-gray-600">
-                                  {participant.positions.join(', ')}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-sm font-semibold text-blue-600">
-                                  {participant.score}/10
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 의견 모음 */}
-                      <div>
-                        <h4 className="font-semibold text-gray-800 mb-2">💭 의견 모음</h4>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {participants
-                            .filter(p => p.opinion.trim())
-                            .map((participant, index) => (
-                              <div key={index} className="p-2 bg-gray-50 rounded">
-                                <div className="text-sm font-medium text-gray-700 mb-1">
-                                  {participant.user.userName}
-                                </div>
-                                <div className="text-sm text-gray-600">
-                                  {participant.opinion}
-                                </div>
-                              </div>
+                {participants.length === 0 ? (
+                  <div className="text-gray-500 text-center py-8">
+                    아직 참여자가 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {participants.map((participant, index) => (
+                      <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center gap-3 mb-3">
+                          {participant.user.profileImage && (
+                            <img 
+                              src={participant.user.profileImage} 
+                              alt="프로필" 
+                              className="w-8 h-8 rounded-full"
+                            />
+                          )}
+                          <span className="font-semibold text-gray-800">
+                            {participant.user.userName}
+                          </span>
+                          <div className="flex gap-2">
+                            {participant.positions.map((position, posIndex) => (
+                              <span 
+                                key={posIndex}
+                                className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                              >
+                                {position}
+                              </span>
                             ))}
-                          {participants.filter(p => p.opinion.trim()).length === 0 && (
-                            <p className="text-sm text-gray-500 italic">의견이 없습니다.</p>
+                          </div>
+                          {participant.score !== null && (
+                            <span className="bg-green-100 text-green-800 text-sm px-2 py-1 rounded-full ml-auto">
+                              {participant.score}점
+                            </span>
                           )}
                         </div>
+                        {participant.opinion && (
+                          <div className="text-gray-600 text-sm bg-white p-3 rounded border-l-4 border-blue-500">
+                            {participant.opinion}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </>
-                )}
-
-                {participants.length === 0 && (
-                  <p className="text-gray-500 italic">참여자가 없습니다.</p>
+                    ))}
+                  </div>
                 )}
               </div>
             );
@@ -233,5 +247,13 @@ export default function AdminPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <AdminProtectedRoute>
+      <AdminPageContent />
+    </AdminProtectedRoute>
   );
 } 

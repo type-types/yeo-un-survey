@@ -5,6 +5,8 @@ export interface User {
   email: string;
   profileImage?: string;
   isAdmin?: boolean;
+  provider?: string;
+  kakaoId?: string;
   createdAt: Date;
 }
 

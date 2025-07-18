@@ -1,5 +1,6 @@
 import { User } from '@/types';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 interface CompleteStepProps {
   user: User;
@@ -7,6 +8,23 @@ interface CompleteStepProps {
 
 export default function CompleteStep({ user }: CompleteStepProps) {
   const router = useRouter();
+  const [countdown, setCountdown] = useState(3);
+
+  // 자동 홈 이동 카운트다운
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          router.push('/');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
@@ -41,12 +59,26 @@ export default function CompleteStep({ user }: CompleteStepProps) {
           </p>
         </div>
 
+        {/* 자동 이동 알림 */}
+        <div className="bg-yellow-50 rounded-lg p-4 mb-6">
+          <h3 className="font-semibold text-yellow-800 mb-2">⏰ 자동 이동</h3>
+          <p className="text-sm text-yellow-700">
+            {countdown}초 후 홈페이지로 자동 이동합니다
+          </p>
+          <div className="w-full bg-yellow-200 rounded-full h-2 mt-2">
+            <div 
+              className="bg-yellow-500 h-2 rounded-full transition-all duration-1000 ease-linear"
+              style={{ width: `${((3 - countdown) / 3) * 100}%` }}
+            />
+          </div>
+        </div>
+
         <div className="space-y-3">
           <button
             onClick={() => router.push('/')}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
           >
-            홈으로 돌아가기
+            바로 홈으로 가기
           </button>
           
           <p className="text-xs text-gray-500">
