@@ -15,6 +15,9 @@ export default function HomePage() {
   
   // 설문 완료 여부 체크를 위해 useSurvey 훅 사용
   const { checkSurveyCompleted } = useSurvey(user?.id || '');
+  
+  // 설문 완료 여부 상태 추가
+  const [isSurveyCompleted, setIsSurveyCompleted] = useState(false);
 
   useEffect(() => {
     // 로그인된 사용자가 있고 로딩이 완료된 경우
@@ -38,6 +41,25 @@ export default function HomePage() {
       checkAndRedirect();
     }
   }, [user, loading, router, checkSurveyCompleted]);
+  
+  // 설문 완료 여부 확인
+  useEffect(() => {
+    if (user) {
+      const checkCompleted = async () => {
+        try {
+          const completed = await checkSurveyCompleted(user.id);
+          setIsSurveyCompleted(completed);
+        } catch (error) {
+          console.error('❌ 설문 완료 여부 확인 오류:', error);
+          setIsSurveyCompleted(false);
+        }
+      };
+      
+      checkCompleted();
+    } else {
+      setIsSurveyCompleted(false);
+    }
+  }, [user, checkSurveyCompleted]);
 
   const handleKakaoLogin = async () => {
     if (!isKakaoLoaded) {
@@ -96,27 +118,7 @@ export default function HomePage() {
     );
   }
 
-  // 설문 완료 여부 상태 추가
-  const [isSurveyCompleted, setIsSurveyCompleted] = useState(false);
-  
-  // 설문 완료 여부 확인
-  useEffect(() => {
-    if (user) {
-      const checkCompleted = async () => {
-        try {
-          const completed = await checkSurveyCompleted(user.id);
-          setIsSurveyCompleted(completed);
-        } catch (error) {
-          console.error('❌ 설문 완료 여부 확인 오류:', error);
-          setIsSurveyCompleted(false);
-        }
-      };
-      
-      checkCompleted();
-    } else {
-      setIsSurveyCompleted(false);
-    }
-  }, [user, checkSurveyCompleted]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-4">
