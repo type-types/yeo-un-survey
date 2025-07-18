@@ -159,13 +159,24 @@ export async function POST(request: NextRequest) {
       finalNickname: kakaoNickname
     });
 
+    // 이메일이 없으면 닉네임 기반 더미 이메일 생성
+    const kakaoEmail = kakaoUser.kakao_account?.email;
+    const dummyEmail = kakaoEmail || `${kakaoNickname.replace(/\s+/g, '').toLowerCase()}_${kakaoUser.id}@kakao.local`;
+    
     const userInfo = {
       name: kakaoNickname,
-      email: kakaoUser.kakao_account?.email || '',
+      email: dummyEmail,
       profileImage: kakaoUser.properties?.profile_image || kakaoUser.kakao_account?.profile?.profile_image_url || '',
       provider: 'kakao',
       kakaoId: kakaoUser.id.toString(),
     };
+    
+    console.log('🔍 이메일 처리:', {
+      hasRealEmail: !!kakaoEmail,
+      realEmail: kakaoEmail,
+      finalEmail: dummyEmail,
+      willShowAsIdentifier: true
+    });
 
     console.log('🔍 처리할 사용자 정보:', {
       firebaseUid,
@@ -190,6 +201,7 @@ export async function POST(request: NextRequest) {
       // 기존 사용자 정보 업데이트
       const updatedUser = await adminAuth.updateUser(firebaseUid, {
         displayName: userInfo.name,
+        email: userInfo.email, // 더미 이메일 포함
         photoURL: userInfo.profileImage || undefined,
       });
       console.log('✅ 기존 사용자 정보 업데이트 완료:', {
@@ -219,7 +231,7 @@ export async function POST(request: NextRequest) {
         const newUser = await adminAuth.createUser({
           uid: firebaseUid,
           displayName: userInfo.name,
-          email: userInfo.email || undefined,
+          email: userInfo.email, // 더미 이메일 포함
           photoURL: userInfo.profileImage || undefined,
         });
         console.log('✅ Firebase 사용자 생성 완료:', {
