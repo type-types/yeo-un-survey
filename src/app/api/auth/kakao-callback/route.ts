@@ -151,10 +151,18 @@ export async function POST(request: NextRequest) {
     
     const firebaseUid = `kakao_${kakaoUser.id}`;
     
+    // 카카오 닉네임 확인
+    const kakaoNickname = kakaoUser.properties?.nickname || kakaoUser.kakao_account?.profile?.nickname || '익명';
+    console.log('🔍 카카오 닉네임 추출:', {
+      fromProperties: kakaoUser.properties?.nickname,
+      fromProfile: kakaoUser.kakao_account?.profile?.nickname,
+      finalNickname: kakaoNickname
+    });
+
     const userInfo = {
-      name: kakaoUser.properties.nickname || '익명',
-      email: kakaoUser.kakao_account.email || '',
-      profileImage: kakaoUser.properties.profile_image || '',
+      name: kakaoNickname,
+      email: kakaoUser.kakao_account?.email || '',
+      profileImage: kakaoUser.properties?.profile_image || kakaoUser.kakao_account?.profile?.profile_image_url || '',
       provider: 'kakao',
       kakaoId: kakaoUser.id.toString(),
     };
@@ -162,8 +170,11 @@ export async function POST(request: NextRequest) {
     console.log('🔍 처리할 사용자 정보:', {
       firebaseUid,
       name: userInfo.name,
+      displayName: userInfo.name,
       hasEmail: !!userInfo.email,
-      hasProfileImage: !!userInfo.profileImage
+      hasProfileImage: !!userInfo.profileImage,
+      kakaoNickname: kakaoUser.properties.nickname,
+      kakaoUserData: kakaoUser.properties
     });
 
     const customClaims = {
@@ -177,11 +188,16 @@ export async function POST(request: NextRequest) {
       console.log('👤 기존 사용자 발견:', firebaseUid);
       
       // 기존 사용자 정보 업데이트
-      await adminAuth.updateUser(firebaseUid, {
+      const updatedUser = await adminAuth.updateUser(firebaseUid, {
         displayName: userInfo.name,
         photoURL: userInfo.profileImage || undefined,
       });
-      console.log('✅ 기존 사용자 정보 업데이트 완료');
+      console.log('✅ 기존 사용자 정보 업데이트 완료:', {
+        uid: updatedUser.uid,
+        displayName: updatedUser.displayName,
+        email: updatedUser.email,
+        photoURL: updatedUser.photoURL
+      });
       
       // Custom Claims 업데이트
       await adminAuth.setCustomUserClaims(firebaseUid, customClaims);
@@ -200,13 +216,18 @@ export async function POST(request: NextRequest) {
         console.log('👤 새 사용자 생성:', firebaseUid);
         
         // 새 사용자 생성
-        await adminAuth.createUser({
+        const newUser = await adminAuth.createUser({
           uid: firebaseUid,
           displayName: userInfo.name,
           email: userInfo.email || undefined,
           photoURL: userInfo.profileImage || undefined,
         });
-        console.log('✅ Firebase 사용자 생성 완료');
+        console.log('✅ Firebase 사용자 생성 완료:', {
+          uid: newUser.uid,
+          displayName: newUser.displayName,
+          email: newUser.email,
+          photoURL: newUser.photoURL
+        });
 
         // Custom Claims 설정
         await adminAuth.setCustomUserClaims(firebaseUid, customClaims);
