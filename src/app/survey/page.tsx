@@ -3,14 +3,15 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useSurvey } from '@/hooks/useSurvey';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import WelcomeStep from '@/components/survey/WelcomeStep';
 import PositionStep from '@/components/survey/PositionStep';
 import SongSelectionStep from '@/components/survey/SongSelectionStep';
 import SongDetailStep from '@/components/survey/SongDetailStep';
 import CompleteStep from '@/components/survey/CompleteStep';
 
-export default function SurveyPage() {
+// useSearchParams를 사용하는 실제 컴포넌트
+function SurveyPageContent() {
   const { user, loading: authLoading, signInWithKakaoCode } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -298,4 +299,20 @@ export default function SurveyPage() {
       {renderStep()}
     </div>
   );
-} 
+}
+
+// Suspense 경계로 감싸는 메인 컴포넌트
+export default function SurveyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-blue-600 font-medium">설문조사 로딩 중...</p>
+        </div>
+      </div>
+    }>
+      <SurveyPageContent />
+    </Suspense>
+  );
+}
